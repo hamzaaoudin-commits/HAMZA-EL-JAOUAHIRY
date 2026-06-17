@@ -13,8 +13,8 @@
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "three": "0.172.0",
-    "@react-three/fiber": "9.0.0-rc.4",
-    "@react-three/drei": "9.122.0",
+    "@react-three/fiber": "9.1.0",
+    "@react-three/drei": "10.0.0",
     "@react-three/postprocessing": "3.0.4"
   },
   "devDependencies": {
