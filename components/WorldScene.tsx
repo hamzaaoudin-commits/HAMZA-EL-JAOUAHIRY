@@ -105,6 +105,7 @@ function Atmosphere({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite 
 // ---------- crystal + shatter + diamond ----------
 function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | null> }) {
   const group = useRef<THREE.Group>(null!)
+  const solid = useRef<THREE.Mesh>(null!)
   const diamond = useRef<THREE.Mesh>(null!)
   const diamondEdges = useRef<THREE.LineSegments>(null!)
   const diamondHalo = useRef<THREE.Sprite>(null!)
@@ -123,11 +124,18 @@ function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | n
     []
   )
 
-  const { frags, shellGroup, edgeGeo, diaGeo, sparkGeo } = useMemo(() => {
+  // one clean solid icosahedron for the whole journey
+  const solidGeo = useMemo(() => new THREE.IcosahedronGeometry(3.5, 1), [])
+  const edgeGeo = useMemo(() => new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(3.5, 1)), [])
+  const diaGeo = useMemo(() => new THREE.OctahedronGeometry(1.7, 0), [])
+
+  // separate fragments, hidden until the explosion
+  const { frags, shellGroup, sparkGeo } = useMemo(() => {
     const base = new THREE.IcosahedronGeometry(3.5, 1)
     const pos = base.attributes.position.array as ArrayLike<number>
     const frags: Frag[] = []
     const shellGroup = new THREE.Group()
+    shellGroup.visible = false
 
     for (let i = 0; i < pos.length; i += 9) {
       const a = new THREE.Vector3(pos[i], pos[i + 1], pos[i + 2])
@@ -149,7 +157,7 @@ function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | n
       g.computeVertexNormals()
       const m = new THREE.MeshStandardMaterial({
         color: 0x0f0f12, metalness: 0.6, roughness: 0.28,
-        flatShading: true, transparent: true, opacity: 1, side: THREE.DoubleSide,
+        flatShading: true, transparent: true, opacity: 1,
       })
       const mesh = new THREE.Mesh(g, m)
       mesh.position.copy(ctr)
@@ -163,9 +171,6 @@ function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | n
       })
     }
 
-    const edgeGeo = new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(3.5, 1))
-    const diaGeo = new THREE.OctahedronGeometry(1.7, 0)
-
     const SN = 220
     const sp = new Float32Array(SN * 3)
     for (let i = 0; i < SN; i++) {
@@ -175,7 +180,7 @@ function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | n
     const sparkGeo = new THREE.BufferGeometry()
     sparkGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3))
 
-    return { frags, shellGroup, edgeGeo, diaGeo, sparkGeo }
+    return { frags, shellGroup, sparkGeo }
   }, [])
 
   useFrame((state) => {
@@ -191,23 +196,26 @@ function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | n
       group.current.rotation.z = mouse.current.x * 0.18
     }
 
-    // big halo breathes, fades during explosion
+    // before the explosion: clean solid crystal. during: switch to fragments.
+    const exploding = ex > 0.001
+    if (solid.current) solid.current.visible = !exploding
+    if (edges.current) edges.current.visible = !exploding
+    shellGroup.visible = exploding
+
     if (haloRef.current) {
       haloRef.current.material.opacity = (0.4 + Math.sin(state.clock.elapsedTime * 1.4) * 0.06) * (1 - ex)
     }
 
-    // shatter
-    for (const f of frags) {
-      tmp.copy(f.home).addScaledVector(f.dir, ex * 20)
-      f.mesh.position.copy(tmp)
-      const r = ex * f.spin * 5
-      f.mesh.rotation.set(f.axis.x * r, f.axis.y * r, f.axis.z * r)
-      ;(f.mesh.material as THREE.MeshStandardMaterial).opacity = 1 - Math.min(1, ex * 1.35)
+    if (exploding) {
+      for (const f of frags) {
+        tmp.copy(f.home).addScaledVector(f.dir, ex * 20)
+        f.mesh.position.copy(tmp)
+        const r = ex * f.spin * 5
+        f.mesh.rotation.set(f.axis.x * r, f.axis.y * r, f.axis.z * r)
+        ;(f.mesh.material as THREE.MeshStandardMaterial).opacity = 1 - Math.min(1, ex * 1.35)
+      }
     }
-    if (edges.current) {
-      ;(edges.current.material as THREE.LineBasicMaterial).opacity = 0.5 * (1 - Math.min(1, ex * 2))
-    }
-    // diamond reveal
+
     if (diamond.current) {
       diamond.current.scale.setScalar(Math.max(0.001, ex * 2.1))
       diamond.current.rotation.y += 0.01 + ex * 0.06
@@ -220,7 +228,6 @@ function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | n
       diamondHalo.current.material.opacity = ex * 0.5
       diamondHalo.current.scale.setScalar(8 + ex * 6)
     }
-    // sparks
     if (sparks.current) {
       sparks.current.scale.setScalar(4 + ex * 16)
       const mat = sparks.current.material as THREE.PointsMaterial
@@ -231,11 +238,16 @@ function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | n
 
   return (
     <group ref={group} scale={[1, 1.18, 1]}>
-      <primitive object={shellGroup} />
-
+      {/* clean solid crystal for the whole journey */}
+      <mesh ref={solid} geometry={solidGeo}>
+        <meshStandardMaterial color="#0f0f12" metalness={0.6} roughness={0.28} flatShading />
+      </mesh>
       <lineSegments ref={edges} geometry={edgeGeo}>
         <lineBasicMaterial color="#C03049" transparent opacity={0.5} />
       </lineSegments>
+
+      {/* fragments — only shown during the explosion */}
+      <primitive object={shellGroup} />
 
       <mesh ref={diamond} scale={0.001}>
         <octahedronGeometry args={[1.7, 0]} />
@@ -249,7 +261,7 @@ function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | n
         </lineSegments>
       </mesh>
 
-      <sprite ref={diamondHalo} scale={[10, 10, 1]}>
+      <sprite ref={diamondHalo} scale={[8, 8, 1]}>
         <spriteMaterial map={diamondHaloTex} transparent depthWrite={false} blending={THREE.AdditiveBlending} opacity={0} />
       </sprite>
 
