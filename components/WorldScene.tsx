@@ -1,7 +1,6 @@
 'use client'
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { useRef, useMemo } from 'react'
 import * as THREE from 'three'
 
@@ -247,16 +246,12 @@ export default function WorldScene() {
     >
       {/* lights — EXACT HTML values */}
       <ambientLight color={0x1a1c22} intensity={0.7} />
-      <pointLight color={0xc03049} intensity={140} distance={70} position={[10, 4, 12]} />
-      <directionalLight color={0xaebccd} intensity={1.6} position={[-8, 6, -4]} />
-      <pointLight color={0x33405e} intensity={55} distance={70} position={[-7, -5, 8]} />
+      <pointLight color={0xc03049} intensity={70} distance={60} position={[10, 4, 12]} />
+      <directionalLight color={0xaebccd} intensity={1.25} position={[-8, 6, -4]} />
+      <pointLight color={0x33405e} intensity={28} distance={60} position={[-7, -5, 8]} />
 
       <WorldContent />
 
-      {/* the only addition over the HTML: real bloom, gentle */}
-      <EffectComposer>
-        <Bloom intensity={0.6} luminanceThreshold={0.35} luminanceSmoothing={0.9} mipmapBlur />
-      </EffectComposer>
     </Canvas>
   )
 }
