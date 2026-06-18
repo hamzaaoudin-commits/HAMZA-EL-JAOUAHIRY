@@ -36,6 +36,21 @@ a {
   text-decoration: none;
 }
 
+
+/* soft radial glow behind the crystal — the HTML's depth layer */
+.glow {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80vw;
+  height: 80vw;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(192,48,73,0.16), rgba(192,48,73,0.03) 40%, transparent 64%);
+  filter: blur(30px);
+}
+
 /* film grain + vignette overlays */
 .vignette {
   position: fixed;
