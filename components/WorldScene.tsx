@@ -5,7 +5,6 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { useRef, useMemo } from 'react'
 import * as THREE from 'three'
 
-// shared scroll progress 0..1
 function getProgress() {
   if (typeof window === 'undefined') return 0
   const max = document.documentElement.scrollHeight - window.innerHeight
@@ -16,6 +15,18 @@ function smooth(a: number, b: number, x: number) {
   return x * x * (3 - 2 * x)
 }
 
+// ---- radial sprite textures (halo + nebula), drawn on a canvas ----
+function radialTexture(stops: [number, string][]) {
+  const c = document.createElement('canvas')
+  c.width = c.height = 256
+  const ctx = c.getContext('2d')!
+  const g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128)
+  for (const [o, col] of stops) g.addColorStop(o, col)
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, 256, 256)
+  return new THREE.CanvasTexture(c)
+}
+
 type Frag = {
   mesh: THREE.Mesh
   home: THREE.Vector3
@@ -24,18 +35,96 @@ type Frag = {
   spin: number
 }
 
-function World3D() {
+// ---------- atmosphere: starfield ----------
+function Stars() {
+  const ref = useRef<THREE.Points>(null!)
+  const geo = useMemo(() => {
+    const N = 1400
+    const pos = new Float32Array(N * 3)
+    for (let i = 0; i < N; i++) {
+      // distribute in a large spherical shell behind the scene
+      const r = 30 + Math.random() * 90
+      const th = Math.random() * Math.PI * 2
+      const ph = Math.acos(2 * Math.random() - 1)
+      pos[i * 3] = r * Math.sin(ph) * Math.cos(th)
+      pos[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th)
+      pos[i * 3 + 2] = -20 - Math.random() * 120
+    }
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    return g
+  }, [])
+  useFrame(() => {
+    if (ref.current) ref.current.rotation.y += 0.0002
+  })
+  return (
+    <points ref={ref} geometry={geo}>
+      <pointsMaterial color="#cfd6e6" size={0.18} sizeAttenuation transparent opacity={0.75} depthWrite={false} />
+    </points>
+  )
+}
+
+// ---------- atmosphere: nebula + halo sprites ----------
+function Atmosphere({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | null> }) {
+  const nebula = useMemo(
+    () =>
+      radialTexture([
+        [0, 'rgba(120,20,38,0.55)'],
+        [0.4, 'rgba(80,16,30,0.28)'],
+        [1, 'rgba(6,6,7,0)'],
+      ]),
+    []
+  )
+  const halo = useMemo(
+    () =>
+      radialTexture([
+        [0, 'rgba(255,120,140,0.6)'],
+        [0.22, 'rgba(192,48,73,0.42)'],
+        [1, 'rgba(192,48,73,0)'],
+      ]),
+    []
+  )
+  return (
+    <>
+      {/* deep nebula, far back, large */}
+      <sprite position={[0, 0, -30]} scale={[120, 120, 1]}>
+        <spriteMaterial map={nebula} transparent depthWrite={false} blending={THREE.AdditiveBlending} opacity={0.9} />
+      </sprite>
+      {/* second nebula, offset, for asymmetry */}
+      <sprite position={[18, -10, -45]} scale={[90, 90, 1]}>
+        <spriteMaterial map={nebula} transparent depthWrite={false} blending={THREE.AdditiveBlending} opacity={0.5} />
+      </sprite>
+      {/* the crimson halo wrapping the crystal-astre */}
+      <sprite ref={haloRef} position={[0, 0, -2]} scale={[26, 26, 1]}>
+        <spriteMaterial map={halo} transparent depthWrite={false} blending={THREE.AdditiveBlending} opacity={0.8} />
+      </sprite>
+    </>
+  )
+}
+
+// ---------- crystal + shatter + diamond ----------
+function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | null> }) {
   const group = useRef<THREE.Group>(null!)
   const diamond = useRef<THREE.Mesh>(null!)
   const diamondEdges = useRef<THREE.LineSegments>(null!)
+  const diamondHalo = useRef<THREE.Sprite>(null!)
   const edges = useRef<THREE.LineSegments>(null!)
   const sparks = useRef<THREE.Points>(null!)
   const mouse = useRef({ x: 0, y: 0 })
   const tmp = useMemo(() => new THREE.Vector3(), [])
 
-  // build shell fragments from the icosahedron faces
+  const diamondHaloTex = useMemo(
+    () =>
+      radialTexture([
+        [0, 'rgba(255,235,238,0.95)'],
+        [0.22, 'rgba(240,100,120,0.5)'],
+        [1, 'rgba(192,48,73,0)'],
+      ]),
+    []
+  )
+
   const { frags, shellGroup, edgeGeo, diaGeo, sparkGeo } = useMemo(() => {
-    const base = new THREE.IcosahedronGeometry(3.5, 1).toNonIndexed()
+    const base = new THREE.IcosahedronGeometry(3.5, 1)
     const pos = base.attributes.position.array as ArrayLike<number>
     const frags: Frag[] = []
     const shellGroup = new THREE.Group()
@@ -59,7 +148,7 @@ function World3D() {
       )
       g.computeVertexNormals()
       const m = new THREE.MeshStandardMaterial({
-        color: 0x0f0f12, metalness: 0.55, roughness: 0.3,
+        color: 0x0f0f12, metalness: 0.6, roughness: 0.28,
         flatShading: true, transparent: true, opacity: 1, side: THREE.DoubleSide,
       })
       const mesh = new THREE.Mesh(g, m)
@@ -77,8 +166,7 @@ function World3D() {
     const edgeGeo = new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(3.5, 1))
     const diaGeo = new THREE.OctahedronGeometry(1.7, 0)
 
-    // spark positions on unit sphere
-    const SN = 170
+    const SN = 220
     const sp = new Float32Array(SN * 3)
     for (let i = 0; i < SN; i++) {
       const v = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize()
@@ -92,7 +180,7 @@ function World3D() {
 
   useFrame((state) => {
     const prog = getProgress()
-    const ex = smooth(0.85, 1.0, prog)
+    const ex = smooth(0.82, 1.0, prog)
     const p = state.pointer
     mouse.current.x += (p.x - mouse.current.x) * 0.04
     mouse.current.y += (p.y - mouse.current.y) * 0.04
@@ -103,32 +191,41 @@ function World3D() {
       group.current.rotation.z = mouse.current.x * 0.18
     }
 
-    // shatter the shell
+    // big halo breathes, fades during explosion
+    if (haloRef.current) {
+      haloRef.current.material.opacity = (0.62 + Math.sin(state.clock.elapsedTime * 1.6) * 0.08) * (1 - ex)
+    }
+
+    // shatter
     for (const f of frags) {
-      tmp.copy(f.home).addScaledVector(f.dir, ex * 16)
+      tmp.copy(f.home).addScaledVector(f.dir, ex * 20)
       f.mesh.position.copy(tmp)
-      const r = ex * f.spin * 4
+      const r = ex * f.spin * 5
       f.mesh.rotation.set(f.axis.x * r, f.axis.y * r, f.axis.z * r)
-      ;(f.mesh.material as THREE.MeshStandardMaterial).opacity = 1 - Math.min(1, ex * 1.4)
+      ;(f.mesh.material as THREE.MeshStandardMaterial).opacity = 1 - Math.min(1, ex * 1.35)
     }
     if (edges.current) {
       ;(edges.current.material as THREE.LineBasicMaterial).opacity = 0.5 * (1 - Math.min(1, ex * 2))
     }
-    // reveal the diamond
+    // diamond reveal
     if (diamond.current) {
-      diamond.current.scale.setScalar(Math.max(0.001, ex * 2.0))
-      diamond.current.rotation.y += 0.01 + ex * 0.05
-      diamond.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.6) * 0.1
+      diamond.current.scale.setScalar(Math.max(0.001, ex * 2.1))
+      diamond.current.rotation.y += 0.01 + ex * 0.06
+      diamond.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.6) * 0.12
     }
     if (diamondEdges.current) {
       ;(diamondEdges.current.material as THREE.LineBasicMaterial).opacity = ex
     }
-    // sparks burst (peaks mid-explosion)
+    if (diamondHalo.current) {
+      diamondHalo.current.material.opacity = ex * 0.9
+      diamondHalo.current.scale.setScalar(10 + ex * 10)
+    }
+    // sparks
     if (sparks.current) {
-      sparks.current.scale.setScalar(4 + ex * 13)
+      sparks.current.scale.setScalar(4 + ex * 16)
       const mat = sparks.current.material as THREE.PointsMaterial
-      mat.opacity = Math.max(0, ex * (1 - ex) * 4) * 0.9
-      mat.size = 0.12 + ex * 0.14
+      mat.opacity = Math.max(0, ex * (1 - ex) * 4) * 0.95
+      mat.size = 0.14 + ex * 0.16
     }
   })
 
@@ -143,8 +240,8 @@ function World3D() {
       <mesh ref={diamond} scale={0.001}>
         <octahedronGeometry args={[1.7, 0]} />
         <meshStandardMaterial
-          color="#F5EDE4" metalness={0.92} roughness={0.07}
-          flatShading emissive="#4a1020" emissiveIntensity={0.55}
+          color="#F5EDE4" metalness={0.92} roughness={0.06}
+          flatShading emissive="#5a1424" emissiveIntensity={0.7}
         />
         <lineSegments ref={diamondEdges}>
           <edgesGeometry args={[diaGeo]} />
@@ -152,11 +249,12 @@ function World3D() {
         </lineSegments>
       </mesh>
 
+      <sprite ref={diamondHalo} scale={[10, 10, 1]}>
+        <spriteMaterial map={diamondHaloTex} transparent depthWrite={false} blending={THREE.AdditiveBlending} opacity={0} />
+      </sprite>
+
       <points ref={sparks} geometry={sparkGeo}>
-        <pointsMaterial
-          color="#FF7E92" size={0.12} transparent opacity={0}
-          depthWrite={false} blending={THREE.AdditiveBlending}
-        />
+        <pointsMaterial color="#FF7E92" size={0.14} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} />
       </points>
     </group>
   )
@@ -177,22 +275,26 @@ function Rig() {
 }
 
 export default function WorldScene() {
+  const haloRef = useRef<THREE.Sprite | null>(null)
   return (
     <Canvas
       camera={{ position: [0, 0, 32], fov: 52 }}
       gl={{ antialias: true, alpha: true }}
       style={{ position: 'fixed', inset: 0, zIndex: 0 }}
     >
+      <fog attach="fog" args={['#060607', 24, 120]} />
       <ambientLight color="#1a1c22" intensity={0.7} />
-      <pointLight color="#C03049" intensity={120} distance={90} position={[10, 4, 12]} />
-      <directionalLight color="#aebccd" intensity={1.25} position={[-8, 6, -4]} />
-      <pointLight color="#33405e" intensity={60} distance={90} position={[-7, -5, 8]} />
+      <pointLight color="#C03049" intensity={140} distance={100} position={[10, 4, 12]} />
+      <directionalLight color="#aebccd" intensity={1.3} position={[-8, 6, -4]} />
+      <pointLight color="#33405e" intensity={70} distance={100} position={[-7, -5, 8]} />
 
-      <World3D />
+      <Stars />
+      <Atmosphere haloRef={haloRef} />
+      <World3D haloRef={haloRef} />
       <Rig />
 
       <EffectComposer>
-        <Bloom intensity={1.2} luminanceThreshold={0.18} luminanceSmoothing={0.9} mipmapBlur />
+        <Bloom intensity={1.5} luminanceThreshold={0.15} luminanceSmoothing={0.9} mipmapBlur />
       </EffectComposer>
     </Canvas>
   )
