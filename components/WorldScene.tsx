@@ -39,7 +39,7 @@ type Frag = {
 function Stars() {
   const ref = useRef<THREE.Points>(null!)
   const geo = useMemo(() => {
-    const N = 1400
+    const N = 700
     const pos = new Float32Array(N * 3)
     for (let i = 0; i < N; i++) {
       // distribute in a large spherical shell behind the scene
@@ -59,34 +59,13 @@ function Stars() {
   })
   return (
     <points ref={ref} geometry={geo}>
-      <pointsMaterial color="#EDEAE4" size={0.06} sizeAttenuation transparent opacity={0.32} depthWrite={false} />
+      <pointsMaterial color="#EDEAE4" size={0.05} sizeAttenuation transparent opacity={0.18} depthWrite={false} />
     </points>
   )
 }
 
-// ---------- atmosphere: crimson halo ----------
-function Atmosphere({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | null> }) {
-  const halo = useMemo(
-    () =>
-      radialTexture([
-        [0, 'rgba(220,70,95,0.9)'],
-        [0.25, 'rgba(192,48,73,0.4)'],
-        [1, 'rgba(192,48,73,0)'],
-      ]),
-    []
-  )
-  return (
-    <>
-      {/* the crimson halo wrapping the crystal-astre — exact port of the HTML radialTex */}
-      <sprite ref={haloRef} scale={[22, 22, 1]}>
-        <spriteMaterial map={halo} transparent depthWrite={false} blending={THREE.AdditiveBlending} opacity={0.8} />
-      </sprite>
-    </>
-  )
-}
-
 // ---------- crystal + shatter + diamond ----------
-function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | null> }) {
+function World3D() {
   const group = useRef<THREE.Group>(null!)
   const solid = useRef<THREE.Mesh>(null!)
   const diamond = useRef<THREE.Mesh>(null!)
@@ -185,10 +164,6 @@ function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | n
     if (edges.current) edges.current.visible = !exploding
     shellGroup.visible = exploding
 
-    if (haloRef.current) {
-      haloRef.current.material.opacity = (0.55 + Math.sin(state.clock.elapsedTime * 1.6) * 0.08) * (1 - ex)
-    }
-
     if (exploding) {
       for (const f of frags) {
         tmp.copy(f.home).addScaledVector(f.dir, ex * 20)
@@ -270,7 +245,6 @@ function Rig() {
 }
 
 export default function WorldScene() {
-  const haloRef = useRef<THREE.Sprite | null>(null)
   return (
     <Canvas
       camera={{ position: [0, 0, 32], fov: 52 }}
@@ -283,12 +257,11 @@ export default function WorldScene() {
       <pointLight color="#33405e" intensity={42} distance={60} position={[-7, -5, 8]} />
 
       <Stars />
-      <Atmosphere haloRef={haloRef} />
-      <World3D haloRef={haloRef} />
+      <World3D />
       <Rig />
 
       <EffectComposer>
-        <Bloom intensity={0.6} luminanceThreshold={0.35} luminanceSmoothing={0.9} mipmapBlur />
+        <Bloom intensity={0.5} luminanceThreshold={0.4} luminanceSmoothing={0.9} mipmapBlur />
       </EffectComposer>
     </Canvas>
   )
