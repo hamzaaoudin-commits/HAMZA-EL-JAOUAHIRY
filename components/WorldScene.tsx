@@ -15,7 +15,7 @@ function smooth(a: number, b: number, x: number) {
   return x * x * (3 - 2 * x)
 }
 
-// ---- radial sprite textures (halo + nebula), drawn on a canvas ----
+// ---- radial sprite texture (halo) drawn on a canvas ----
 function radialTexture(stops: [number, string][]) {
   const c = document.createElement('canvas')
   c.width = c.height = 256
@@ -59,44 +59,27 @@ function Stars() {
   })
   return (
     <points ref={ref} geometry={geo}>
-      <pointsMaterial color="#aab2c4" size={0.14} sizeAttenuation transparent opacity={0.55} depthWrite={false} />
+      <pointsMaterial color="#EDEAE4" size={0.06} sizeAttenuation transparent opacity={0.32} depthWrite={false} />
     </points>
   )
 }
 
-// ---------- atmosphere: nebula + halo sprites ----------
+// ---------- atmosphere: crimson halo ----------
 function Atmosphere({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | null> }) {
-  const nebula = useMemo(
-    () =>
-      radialTexture([
-        [0, 'rgba(70,14,24,0.32)'],
-        [0.45, 'rgba(40,10,16,0.14)'],
-        [1, 'rgba(6,6,7,0)'],
-      ]),
-    []
-  )
   const halo = useMemo(
     () =>
       radialTexture([
-        [0, 'rgba(180,40,60,0.34)'],
-        [0.18, 'rgba(140,32,48,0.18)'],
-        [1, 'rgba(120,30,44,0)'],
+        [0, 'rgba(220,70,95,0.9)'],
+        [0.25, 'rgba(192,48,73,0.4)'],
+        [1, 'rgba(192,48,73,0)'],
       ]),
     []
   )
   return (
     <>
-      {/* deep nebula, far back, subtle */}
-      <sprite position={[0, 0, -42]} scale={[90, 90, 1]}>
-        <spriteMaterial map={nebula} transparent depthWrite={false} blending={THREE.AdditiveBlending} opacity={0.55} />
-      </sprite>
-      {/* second nebula, offset, for asymmetry */}
-      <sprite position={[22, -14, -58]} scale={[70, 70, 1]}>
-        <spriteMaterial map={nebula} transparent depthWrite={false} blending={THREE.AdditiveBlending} opacity={0.3} />
-      </sprite>
-      {/* the crimson halo wrapping the crystal-astre — contained, not overwhelming */}
-      <sprite ref={haloRef} position={[0, 0, -3]} scale={[15, 15, 1]}>
-        <spriteMaterial map={halo} transparent depthWrite={false} blending={THREE.AdditiveBlending} opacity={0.5} />
+      {/* the crimson halo wrapping the crystal-astre — exact port of the HTML radialTex */}
+      <sprite ref={haloRef} scale={[22, 22, 1]}>
+        <spriteMaterial map={halo} transparent depthWrite={false} blending={THREE.AdditiveBlending} opacity={0.8} />
       </sprite>
     </>
   )
@@ -203,7 +186,7 @@ function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | n
     shellGroup.visible = exploding
 
     if (haloRef.current) {
-      haloRef.current.material.opacity = (0.4 + Math.sin(state.clock.elapsedTime * 1.4) * 0.06) * (1 - ex)
+      haloRef.current.material.opacity = (0.55 + Math.sin(state.clock.elapsedTime * 1.6) * 0.08) * (1 - ex)
     }
 
     if (exploding) {
@@ -240,10 +223,10 @@ function World3D({ haloRef }: { haloRef: React.MutableRefObject<THREE.Sprite | n
     <group ref={group} scale={[1, 1.18, 1]}>
       {/* clean solid crystal for the whole journey */}
       <mesh ref={solid} geometry={solidGeo}>
-        <meshStandardMaterial color="#0f0f12" metalness={0.6} roughness={0.28} flatShading />
+        <meshStandardMaterial color="#0f0f12" metalness={0.55} roughness={0.3} flatShading />
       </mesh>
       <lineSegments ref={edges} geometry={edgeGeo}>
-        <lineBasicMaterial color="#C03049" transparent opacity={0.5} />
+        <lineBasicMaterial color="#C03049" transparent opacity={0.45} />
       </lineSegments>
 
       {/* fragments — only shown during the explosion */}
@@ -294,11 +277,10 @@ export default function WorldScene() {
       gl={{ antialias: true, alpha: true }}
       style={{ position: 'fixed', inset: 0, zIndex: 0 }}
     >
-      <fog attach="fog" args={['#060607', 24, 120]} />
       <ambientLight color="#1a1c22" intensity={0.7} />
-      <pointLight color="#C03049" intensity={95} distance={100} position={[10, 4, 12]} />
-      <directionalLight color="#aebccd" intensity={1.3} position={[-8, 6, -4]} />
-      <pointLight color="#33405e" intensity={70} distance={100} position={[-7, -5, 8]} />
+      <pointLight color="#C03049" intensity={90} distance={60} position={[10, 4, 12]} />
+      <directionalLight color="#aebccd" intensity={1.25} position={[-8, 6, -4]} />
+      <pointLight color="#33405e" intensity={42} distance={60} position={[-7, -5, 8]} />
 
       <Stars />
       <Atmosphere haloRef={haloRef} />
@@ -306,7 +288,7 @@ export default function WorldScene() {
       <Rig />
 
       <EffectComposer>
-        <Bloom intensity={0.85} luminanceThreshold={0.28} luminanceSmoothing={0.9} mipmapBlur />
+        <Bloom intensity={0.6} luminanceThreshold={0.35} luminanceSmoothing={0.9} mipmapBlur />
       </EffectComposer>
     </Canvas>
   )
