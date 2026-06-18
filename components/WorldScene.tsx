@@ -86,7 +86,7 @@ function WorldContent() {
       const m = new THREE.Mesh(
         g,
         new THREE.MeshStandardMaterial({
-          color: 0x0f0f12, metalness: 0.55, roughness: 0.3,
+          color: 0x0f0f12, metalness: 0.8, roughness: 0.22,
           flatShading: true, transparent: true, opacity: 1, side: THREE.DoubleSide,
         })
       )
@@ -246,9 +246,10 @@ export default function WorldScene() {
     >
       {/* lights — EXACT HTML values */}
       <ambientLight color={0x1a1c22} intensity={0.7} />
-      <pointLight color={0xc03049} intensity={70} distance={60} position={[10, 4, 12]} />
-      <directionalLight color={0xaebccd} intensity={1.25} position={[-8, 6, -4]} />
-      <pointLight color={0x33405e} intensity={28} distance={60} position={[-7, -5, 8]} />
+      <pointLight color={0xe0466a} intensity={260} distance={80} position={[10, 4, 12]} />
+      <directionalLight color={0xaebccd} intensity={1.4} position={[-8, 6, -4]} />
+      <pointLight color={0xff5d86} intensity={120} distance={70} position={[6, 2, 10]} />
+      <pointLight color={0x33405e} intensity={40} distance={70} position={[-7, -5, 8]} />
 
       <WorldContent />
 
