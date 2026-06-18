@@ -43,12 +43,12 @@ a {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 80vw;
-  height: 80vw;
+  width: 70vw;
+  height: 70vw;
   z-index: 1;
   pointer-events: none;
-  background: radial-gradient(circle, rgba(192,48,73,0.16), rgba(192,48,73,0.03) 40%, transparent 64%);
-  filter: blur(30px);
+  background: radial-gradient(circle, rgba(192,48,73,0.12), rgba(192,48,73,0.025) 40%, transparent 62%);
+  filter: blur(36px);
 }
 
 /* film grain + vignette overlays */
