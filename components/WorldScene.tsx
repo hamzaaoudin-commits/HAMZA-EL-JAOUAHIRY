@@ -72,6 +72,7 @@ function World3D() {
   const diamondEdges = useRef<THREE.LineSegments>(null!)
   const diamondHalo = useRef<THREE.Sprite>(null!)
   const edges = useRef<THREE.LineSegments>(null!)
+  const glow = useRef<THREE.Mesh>(null!)
   const sparks = useRef<THREE.Points>(null!)
   const mouse = useRef({ x: 0, y: 0 })
   const tmp = useMemo(() => new THREE.Vector3(), [])
@@ -87,8 +88,23 @@ function World3D() {
   )
 
   // one clean solid icosahedron for the whole journey
-  const solidGeo = useMemo(() => new THREE.IcosahedronGeometry(3.5, 1), [])
-  const edgeGeo = useMemo(() => new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(3.5, 1)), [])
+  const solidGeo = useMemo(() => {
+    const g = new THREE.IcosahedronGeometry(3.4, 5) // dense facets
+    const pos = g.attributes.position as THREE.BufferAttribute
+    const v = new THREE.Vector3()
+    // subtle crystalline displacement so it scintillates instead of being a smooth ball
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i)
+      const n = Math.sin(v.x * 2.1) * Math.cos(v.y * 1.7) * Math.sin(v.z * 2.4)
+      const k = 1 + n * 0.05
+      v.multiplyScalar(k)
+      pos.setXYZ(i, v.x, v.y, v.z)
+    }
+    pos.needsUpdate = true
+    g.computeVertexNormals()
+    return g
+  }, [])
+  const edgeGeo = useMemo(() => new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(3.45, 2), 18), [])
   const diaGeo = useMemo(() => new THREE.OctahedronGeometry(1.7, 0), [])
 
   // separate fragments, hidden until the explosion
@@ -162,6 +178,7 @@ function World3D() {
     const exploding = ex > 0.001
     if (solid.current) solid.current.visible = !exploding
     if (edges.current) edges.current.visible = !exploding
+    if (glow.current) glow.current.visible = !exploding
     shellGroup.visible = exploding
 
     if (exploding) {
@@ -198,11 +215,30 @@ function World3D() {
     <group ref={group} scale={[1, 1.18, 1]}>
       {/* clean solid crystal for the whole journey */}
       <mesh ref={solid} geometry={solidGeo}>
-        <meshStandardMaterial color="#0f0f12" metalness={0.55} roughness={0.3} flatShading />
+        <meshStandardMaterial
+          color="#141318"
+          metalness={0.85}
+          roughness={0.18}
+          flatShading={false}
+          envMapIntensity={1.4}
+        />
       </mesh>
       <lineSegments ref={edges} geometry={edgeGeo}>
-        <lineBasicMaterial color="#C03049" transparent opacity={0.45} />
+        <lineBasicMaterial color="#C03049" transparent opacity={0.4} />
       </lineSegments>
+
+      {/* crimson rim glow hugging the crystal — backside shell, soft, never a flat disc */}
+      <mesh ref={glow} scale={1.28}>
+        <icosahedronGeometry args={[3.4, 5]} />
+        <meshBasicMaterial
+          color="#C03049"
+          transparent
+          opacity={0.16}
+          side={THREE.BackSide}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
 
       {/* fragments — only shown during the explosion */}
       <primitive object={shellGroup} />
@@ -252,8 +288,9 @@ export default function WorldScene() {
       style={{ position: 'fixed', inset: 0, zIndex: 0 }}
     >
       <ambientLight color="#1a1c22" intensity={0.7} />
-      <pointLight color="#C03049" intensity={90} distance={60} position={[10, 4, 12]} />
-      <directionalLight color="#aebccd" intensity={1.25} position={[-8, 6, -4]} />
+      <pointLight color="#C03049" intensity={110} distance={70} position={[10, 4, 12]} />
+      <directionalLight color="#aebccd" intensity={1.6} position={[-8, 6, -4]} />
+      <directionalLight color="#ff90a4" intensity={0.8} position={[6, -3, 6]} />
       <pointLight color="#33405e" intensity={42} distance={60} position={[-7, -5, 8]} />
 
       <Stars />
@@ -261,7 +298,7 @@ export default function WorldScene() {
       <Rig />
 
       <EffectComposer>
-        <Bloom intensity={0.5} luminanceThreshold={0.4} luminanceSmoothing={0.9} mipmapBlur />
+        <Bloom intensity={0.7} luminanceThreshold={0.3} luminanceSmoothing={0.9} mipmapBlur />
       </EffectComposer>
     </Canvas>
   )
