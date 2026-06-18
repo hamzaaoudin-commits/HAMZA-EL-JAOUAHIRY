@@ -47,7 +47,7 @@ a {
   height: 70vw;
   z-index: 1;
   pointer-events: none;
-  background: radial-gradient(circle, rgba(192,48,73,0.12), rgba(192,48,73,0.025) 40%, transparent 62%);
+  background: radial-gradient(circle, rgba(192,48,73,0.10), rgba(192,48,73,0.02) 42%, transparent 64%);
   filter: blur(36px);
 }
 
